@@ -68,7 +68,10 @@ async def save(repo: PortfolioRepository, user: dict, fields: dict, identifier: 
 async def remove(repo: PortfolioRepository, user: dict, identifier: str) -> None:
     """Reject referenced portfolios and audit successful deletion."""
     doc = await fetch(repo, user, identifier, "delete")
+    if not await repo.begin_delete(doc["_id"]):
+        raise HTTPException(409, "Portfolio is busy or being deleted; try again")
     if await repo.has_applications(doc["_id"]):
+        await repo.cancel_delete(doc["_id"])
         raise HTTPException(409, "Cannot delete a portfolio containing applications")
     if not await repo.delete(doc["_id"]):
         raise HTTPException(404, "Portfolio not found")

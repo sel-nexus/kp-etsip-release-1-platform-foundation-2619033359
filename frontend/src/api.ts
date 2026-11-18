@@ -2,7 +2,7 @@
 const base = import.meta.env.VITE_API_BASE ?? '/api';
 export const tokenKey = 'kp-etsip-token';
 
-export async function api<T>(path: string, options: RequestInit = {}): Promise<T> {
+export async function api<T>(path: string, options: RequestInit = {}, format: 'json' | 'blob' = 'json'): Promise<T> {
   const headers = new Headers(options.headers);
   if (options.body) headers.set('Content-Type', 'application/json');
   const token = sessionStorage.getItem(tokenKey);
@@ -21,5 +21,6 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
     throw new Error(detail);
   }
   if (response.status === 204) return undefined as T;
+  if (format === 'blob') return await response.blob() as T;
   return response.json() as Promise<T>;
 }

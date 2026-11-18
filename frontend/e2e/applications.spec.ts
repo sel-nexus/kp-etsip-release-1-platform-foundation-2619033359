@@ -1,0 +1,31 @@
+import { test, expect } from '@playwright/test';
+
+test('engineer creates, filters, edits and reloads an application from the real API', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+  const name = `E2E Application ${Date.now()}`;
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(process.env.E2E_ENGINEER_EMAIL ?? 'engineer@ketsip.local');
+  await page.getByLabel('Password').fill(process.env.E2E_ENGINEER_PASSWORD ?? 'LocalDemo123!');
+  await page.getByRole('button', {name:'Sign in'}).click();
+  await page.getByRole('link', {name:'Applications'}).click();
+  await page.getByRole('button', {name:'Create application'}).click();
+  await page.getByLabel('Name', {exact:true}).fill(name);
+  await page.getByLabel('Business owner').fill('E2E owner');
+  await page.getByLabel('Risk level').selectOption('High');
+  await page.getByRole('button', {name:'Save application'}).click();
+  await expect(page.getByRole('heading', {name})).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('E2E owner')).toBeVisible();
+  await expect(page.getByRole('button', {name:'Delete application'})).toHaveCount(0);
+  await page.getByRole('button', {name:'Edit application'}).click();
+  await page.getByLabel('Technology owner').fill('E2E technology owner');
+  await page.getByRole('button', {name:'Save application'}).click();
+  await expect(page.getByText('E2E technology owner')).toBeVisible();
+  await page.getByRole('link', {name:'Back to applications'}).click();
+  await page.getByLabel('Search').fill(name);
+  await page.getByLabel('Risk level').selectOption('High');
+  await expect(page.getByRole('link', {name})).toBeVisible();
+  expect(errors).toEqual([]);
+});

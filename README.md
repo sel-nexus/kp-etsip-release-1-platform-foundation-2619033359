@@ -1,6 +1,6 @@
 # KP ETSIP — identity foundation
 
-This slice provides local sign-in and profile management. Dashboard, inventory, administration and reporting are not implemented yet. Destination pages identify that limitation rather than showing fabricated data.
+This foundation provides local identity, portfolios, and applications. Dashboard, administration and reporting remain future slices. Application quality metrics are manually entered, not live measurements.
 
 ## Local run
 
@@ -24,7 +24,11 @@ npm run dev
 
 Open http://localhost:5173. Vite proxies `/api` to the backend. Alternatively run `docker compose up --build` from the root and visit http://localhost:8080. Compose uses an unauthenticated MongoDB on an internal network for local use only and a persistent `mongo_data` volume.
 
-Local seed credentials, when `.env.example` values are used: `admin@ketsip.local` / `LocalAdmin123!` (initial change required), and `executive@ketsip.local`, `leader@ketsip.local`, `engineer@ketsip.local`, `auditor@ketsip.local`, `readonly@ketsip.local` / `LocalDemo123!`. Seed inserts only missing records; changing environment passwords does not reset existing users. Leader has no assigned portfolios until a later administration slice.
+Local seed credentials, when `.env.example` values are used: `admin@ketsip.local` / `LocalAdmin123!` (initial change required), and `executive@ketsip.local`, `leader@ketsip.local`, `engineer@ketsip.local`, `auditor@ketsip.local`, `readonly@ketsip.local` / `LocalDemo123!`. Seed inserts only missing records; changing environment passwords does not reset existing users. The seeded leader is assigned Payments.
+
+## Inventory coordination and recovery
+
+Application create and transfer reserve the destination portfolio by an atomic update on its MongoDB document. Portfolio deletion first marks that document only if no reservations exist, blocking new reservations, then checks for application references. A busy or nonempty portfolio returns 409. This works across API processes on a standalone MongoDB without multi-document transactions; all application writers, including seed jobs, must use the same protocol. Majority-acknowledged writes protect the protocol from normal replica-set failover. An uncertain database failure or process crash may leave a reservation or deletion marker behind: operations then fail closed rather than risking an orphan. An operator must stop all writers, inspect the portfolio and its application references, then remove stale `applicationReservations` or `deleting` fields before resuming. Never expire these automatically. Audit inserts follow the inventory mutation and are not atomic with it: a database failure can leave a completed mutation without its audit event and should be investigated. Direct database writes that bypass this protocol are unsafe.
 
 ## Security and deployment
 

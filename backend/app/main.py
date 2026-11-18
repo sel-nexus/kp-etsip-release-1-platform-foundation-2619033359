@@ -3,7 +3,9 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import AsyncMongoClient
+from pymongo.write_concern import WriteConcern
 from app.auth.router import router as identity_router
+from app.applications.router import router as application_router
 from app.portfolios.router import router as portfolio_router
 from app.core.config import get_settings
 from app.core.database import create_indexes
@@ -16,7 +18,7 @@ async def lifespan(app: FastAPI):
     settings = get_settings()
     client = AsyncMongoClient(settings.MONGODB_URI, serverSelectionTimeoutMS=5000, tz_aware=True)
     try:
-        app.state.db = client.get_database(settings.MONGODB_DB)
+        app.state.db = client.get_database(settings.MONGODB_DB, write_concern=WriteConcern("majority"))
         await client.admin.command("ping")
         await create_indexes(app.state.db)
         if settings.SEED_ON_STARTUP:
@@ -31,6 +33,7 @@ app = FastAPI(title="KP ETSIP API", version="1.0.0", description="Local identity
 app.add_middleware(CORSMiddleware, allow_origins=settings.origins, allow_credentials=False, allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type"])
 app.include_router(identity_router, prefix="/api")
 app.include_router(portfolio_router, prefix="/api")
+app.include_router(application_router, prefix="/api")
 
 
 @app.get("/api/health", tags=["Health"])

@@ -30,7 +30,8 @@ class PortfolioRepository:
         ])
         result = await cursor.to_list(None)
         average = result[0]["average"] if result else None
-        return {**doc, "applicationCount": result[0]["count"] if result else 0, "qualityScore": int(average + 0.5) if average is not None else None}
+        public = {key: value for key, value in doc.items() if key not in ("applicationReservations", "deleting")}
+        return {**public, "applicationCount": result[0]["count"] if result else 0, "qualityScore": int(average + 0.5) if average is not None else None}
 
     async def get(self, identifier: ObjectId) -> dict | None:
         """Find a portfolio by its identifier."""
@@ -47,9 +48,21 @@ class PortfolioRepository:
         """Replace editable fields while preserving creation metadata."""
         return await self.db.portfolios.find_one_and_update({"_id": identifier}, {"$set": {**fields, "updatedAt": timestamp()}}, return_document=ReturnDocument.AFTER)
 
+    async def begin_delete(self, identifier: ObjectId) -> bool:
+        """Block new reservations only when no application writer holds one."""
+        result = await self.db.portfolios.update_one(
+            {"_id": identifier, "deleting": {"$ne": True}, "applicationReservations.0": {"$exists": False}},
+            {"$set": {"deleting": True}},
+        )
+        return result.modified_count == 1
+
+    async def cancel_delete(self, identifier: ObjectId) -> None:
+        """Unblock application writers after a definite reference check."""
+        await self.db.portfolios.update_one({"_id": identifier, "deleting": True}, {"$unset": {"deleting": ""}})
+
     async def delete(self, identifier: ObjectId) -> bool:
-        """Delete an existing portfolio."""
-        return (await self.db.portfolios.delete_one({"_id": identifier})).deleted_count == 1
+        """Delete a portfolio with its deletion marker held."""
+        return (await self.db.portfolios.delete_one({"_id": identifier, "deleting": True})).deleted_count == 1
 
     async def applications(self, identifier: ObjectId, limit: int, offset: int) -> tuple[list[dict], int]:
         """Return a bounded list of linked application records."""

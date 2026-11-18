@@ -49,7 +49,8 @@ async def test_seed_filter_pagination_and_validation(client):
     result = await client.get('/api/portfolios', headers=auth, params={'search':'pay', 'status':'Active', 'productArea':'Payments'})
     assert result.status_code == 200 and result.json()['total'] == 1
     assert result.json()['items'][0]['name'] == 'Payments'
-    assert result.json()['items'][0]['qualityScore'] is None
+    assert result.json()['items'][0]['applicationCount'] == 3
+    assert result.json()['items'][0]['qualityScore'] == 82
     assert (await client.get('/api/portfolios', headers=auth, params={'search':'.*'})).json()['total'] == 0
     assert len((await client.get('/api/portfolios', headers=auth, params={'limit':1, 'offset':1})).json()['items']) == 1
     for params in ({'limit':0}, {'limit':101}, {'offset':-1}, {'status':'Unknown'}):
