@@ -9,6 +9,8 @@ from app.admin.router import router as admin_router
 from app.applications.router import router as application_router
 from app.portfolios.router import router as portfolio_router
 from app.dashboard.router import router as dashboard_router
+from app.audit.router import router as audit_router
+from app.reports.router import router as reports_router
 from app.core.config import get_settings
 from app.core.database import create_indexes
 from app.core.seed import seed_database
@@ -38,6 +40,8 @@ app.include_router(admin_router, prefix="/api")
 app.include_router(portfolio_router, prefix="/api")
 app.include_router(application_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
+app.include_router(audit_router, prefix="/api")
+app.include_router(reports_router, prefix="/api")
 
 
 @app.get("/api/health", tags=["Health"])

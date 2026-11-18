@@ -9,6 +9,8 @@ import PortfolioPage from './portfolios/PortfolioPage';
 import ApplicationPage from './applications/ApplicationPage';
 import DashboardPage from './dashboard/DashboardPage';
 import AdminPage from './admin/AdminPage';
+import ReportsPage from './reports/ReportsPage';
+import AuditPage from './reports/AuditPage';
 
 /** Route identity screens and restore an existing browser session. */
 function Shell() {
@@ -34,7 +36,7 @@ function Shell() {
       <header className="site-header">
         <div className="header-inner">
           <Link className="brand" to="/">KP <span>ETSIP</span></Link>
-          {user && <nav aria-label="Account">{!user.mustChangePassword && <><Link to="/dashboard">Dashboard</Link><Link to="/portfolios">Portfolios</Link><Link to="/applications">Applications</Link>{user.role === 'Administrator' && <Link to="/admin">Administration</Link>}</>}<Link to="/profile">My profile</Link><button className="text-button" onClick={logout}>Sign out</button></nav>}
+          {user && <nav aria-label="Account">{!user.mustChangePassword && <><Link to="/dashboard">Dashboard</Link><Link to="/portfolios">Portfolios</Link><Link to="/applications">Applications</Link><Link to="/reports">Reports</Link>{(user.role === 'Administrator' || user.role === 'Auditor') && <Link to="/audit">Audit log</Link>}{user.role === 'Administrator' && <Link to="/admin">Administration</Link>}</>}<Link to="/profile">My profile</Link><button className="text-button" onClick={logout}>Sign out</button></nav>}
         </div>
       </header>
       {error && <p className="global-message" role="alert">{error}</p>}
@@ -45,6 +47,8 @@ function Shell() {
         <Route path="/" element={<Navigate to={user ? landingPath(user) : '/login'} replace />} />
         <Route path="/dashboard" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <DashboardPage /> : <Navigate to="/login" replace />} />
         <Route path="/applications/:id?" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <ApplicationPage user={user} /> : <Navigate to="/login" replace />} />
+        <Route path="/reports" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <ReportsPage /> : <Navigate to="/login" replace />} />
+        <Route path="/audit" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <AuditPage user={user} /> : <Navigate to="/login" replace />} />
         <Route path="/admin" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <AdminPage user={user} /> : <Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

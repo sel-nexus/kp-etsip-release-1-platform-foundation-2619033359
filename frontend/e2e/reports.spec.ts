@@ -1,0 +1,35 @@
+import { test, expect } from '@playwright/test';
+
+test('auditor views inventory reports and filtered audit activity, and exports CSV', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(process.env.E2E_AUDITOR_EMAIL ?? 'auditor@ketsip.local');
+  await page.getByLabel('Password').fill(process.env.E2E_DEMO_PASSWORD ?? 'LocalDemo123!');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('link', { name: 'Reports' })).toBeVisible();
+  expect(await page.getByRole('link', { name: 'Administration' }).count()).toBe(0);
+  const reportResponse = page.waitForResponse(response => response.url().includes('/api/reports/applications') && response.status() === 200);
+  await page.getByRole('link', { name: 'Reports' }).click();
+  const report = await (await reportResponse).json();
+  await expect(page.getByRole('region', { name: 'Report results' })).toContainText(`${report.total} results`);
+  if (report.items.length) await expect(page.getByRole('link', { name: report.items[0].name, exact: true })).toBeVisible();
+  const portfolioResponse = page.waitForResponse(response => response.url().includes('/api/reports/portfolios') && response.status() === 200);
+  await page.getByLabel('Report').selectOption('portfolios');
+  const portfolios = await (await portfolioResponse).json();
+  await expect(page.getByRole('region', { name: 'Report results' })).toContainText(`${portfolios.total} results`);
+  const download = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export CSV' }).click();
+  expect((await download).suggestedFilename()).toBe('portfolios-report.csv');
+  const auditResponse = page.waitForResponse(response => response.url().includes('/api/audit-logs') && response.status() === 200);
+  await page.getByRole('link', { name: 'Audit log' }).click();
+  const audit = await (await auditResponse).json();
+  await expect(page.getByRole('region', { name: 'Audit results' })).toContainText(`${audit.total} events`);
+  const filteredResponse = page.waitForResponse(response => response.url().includes('action=export') && response.url().includes('/api/audit-logs') && response.status() === 200);
+  await page.getByLabel('Action').fill('export');
+  const filtered = await (await filteredResponse).json();
+  expect(filtered.items.every((item: { action: string }) => item.action === 'export')).toBe(true);
+  await expect(page.getByRole('region', { name: 'Audit results' })).toContainText(`${filtered.total} events`);
+  expect(errors).toEqual([]);
+});
