@@ -77,6 +77,10 @@ class PortfolioRepository:
         """Determine whether an application references the portfolio."""
         return bool(await self.db.applications.find_one({"portfolioId": str(identifier)}, {"_id": 1}))
 
+    async def has_users(self, identifier: ObjectId) -> bool:
+        """Determine whether any account references this portfolio."""
+        return bool(await self.db.users.find_one({"portfolioAccess": str(identifier)}, {"_id": 1}))
+
     async def audit(self, user: dict, action: str, identifier: ObjectId) -> None:
         """Record a successful mutation without sensitive fields."""
         now = timestamp()

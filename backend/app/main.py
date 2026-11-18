@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pymongo import AsyncMongoClient
 from pymongo.write_concern import WriteConcern
 from app.auth.router import router as identity_router
+from app.admin.router import router as admin_router
 from app.applications.router import router as application_router
 from app.portfolios.router import router as portfolio_router
 from app.dashboard.router import router as dashboard_router
@@ -33,6 +34,7 @@ settings = get_settings()
 app = FastAPI(title="KP ETSIP API", version="1.0.0", description="Local identity and quality inventory foundation", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=settings.origins, allow_credentials=False, allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type"])
 app.include_router(identity_router, prefix="/api")
+app.include_router(admin_router, prefix="/api")
 app.include_router(portfolio_router, prefix="/api")
 app.include_router(application_router, prefix="/api")
 app.include_router(dashboard_router, prefix="/api")
