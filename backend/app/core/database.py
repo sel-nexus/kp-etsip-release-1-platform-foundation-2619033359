@@ -14,3 +14,5 @@ async def create_indexes(db: AsyncDatabase) -> None:
     await db.roles.create_index("name", unique=True)
     await db.audit_logs.create_index("timestamp")
     await db.audit_logs.create_index("userId")
+    await db.portfolios.create_index("name", unique=True)
+    await db.applications.create_index("portfolioId")

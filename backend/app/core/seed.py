@@ -18,11 +18,14 @@ ROLES = {
 async def seed_database(db: AsyncDatabase, settings: Settings) -> None:
     """Insert missing roles and demo users without replacing existing changes."""
     now = timestamp()
+    for name, owner, area in [("Payments", "Payments Team", "Payments"), ("Customer Platform", "Customer Team", "Customer"), ("Data & Analytics", "Data Team", "Data")]:
+        await db.portfolios.update_one({"name": name}, {"$setOnInsert": {"name": name, "owner": owner, "description": "", "productArea": area, "status": "Active", "createdAt": now, "updatedAt": now}}, upsert=True)
+    payments = await db.portfolios.find_one({"name": "Payments"})
     admin_hash = await run_in_threadpool(hash_password, settings.ADMIN_INITIAL_PASSWORD)
     demo_hash = await run_in_threadpool(hash_password, settings.DEMO_INITIAL_PASSWORD)
     for role, permissions in ROLES.items():
         await db.roles.update_one({"name": role}, {"$setOnInsert": {"name": role, "description": f"{role} access", "permissions": permissions, "createdAt": now, "updatedAt": now}}, upsert=True)
         slug = {"Administrator": "admin", "Portfolio Leader": "leader", "Read Only": "readonly"}.get(role, role.lower())
         email = f"{slug}@ketsip.local"
-        user = {"name": f"Demo {role}", "email": email, "passwordHash": admin_hash if role == "Administrator" else demo_hash, "role": role, "portfolioAccess": [], "status": "Active", "lastLogin": None, "authSource": "local", "managerName": None, "vendorIndicator": False, "mustChangePassword": role == "Administrator", "defaultLandingPage": None, "tokenVersion": 0, "createdAt": now, "updatedAt": now}
+        user = {"name": f"Demo {role}", "email": email, "passwordHash": admin_hash if role == "Administrator" else demo_hash, "role": role, "portfolioAccess": [str(payments["_id"])] if role == "Portfolio Leader" else [], "status": "Active", "lastLogin": None, "authSource": "local", "managerName": None, "vendorIndicator": False, "mustChangePassword": role == "Administrator", "defaultLandingPage": None, "tokenVersion": 0, "createdAt": now, "updatedAt": now}
         await db.users.update_one({"email": email}, {"$setOnInsert": user}, upsert=True)

@@ -1,0 +1,35 @@
+import { test, expect } from '@playwright/test';
+
+test('administrator creates, searches, edits and deletes an empty portfolio', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', msg => { if (msg.type() === 'error') errors.push(msg.text()); });
+  const name = `E2E Portfolio ${Date.now()}`;
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(process.env.E2E_ADMIN_EMAIL ?? 'admin@ketsip.local');
+  await page.getByLabel('Password').fill(process.env.E2E_ADMIN_PASSWORD ?? 'LocalAdmin123!');
+  await page.getByRole('button', {name:'Sign in'}).click();
+  await expect(page.getByRole('link', {name:'Portfolios'})).toBeVisible();
+  await page.getByRole('link', {name:'Portfolios'}).click();
+  await page.getByRole('button', {name:'Create portfolio'}).click();
+  await page.getByLabel('Name', {exact:true}).fill(name);
+  await page.getByLabel('Owner').fill('E2E owner');
+  await page.getByLabel('Product area', {exact:true}).fill('E2E area');
+  await page.getByRole('button', {name:'Save portfolio'}).click();
+  await expect(page.getByRole('heading', {name})).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('E2E owner')).toBeVisible();
+  await page.getByRole('button', {name:'Edit portfolio'}).click();
+  await page.getByLabel('Owner').fill('Updated owner');
+  await page.getByRole('button', {name:'Save portfolio'}).click();
+  await expect(page.getByText('Updated owner')).toBeVisible();
+  await page.getByRole('link', {name:'Back to portfolios'}).click();
+  await page.getByLabel('Search').fill(name);
+  await page.getByLabel('Status').selectOption('Active');
+  await page.getByLabel('Product area').fill('E2E area');
+  await page.getByRole('link', {name}).click();
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', {name:'Delete portfolio'}).click();
+  await expect(page.getByText('Portfolio deleted.')).toBeVisible();
+  expect(errors).toEqual([]);
+});

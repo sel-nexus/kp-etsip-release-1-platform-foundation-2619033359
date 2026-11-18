@@ -4,6 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import AsyncMongoClient
 from app.auth.router import router as identity_router
+from app.portfolios.router import router as portfolio_router
 from app.core.config import get_settings
 from app.core.database import create_indexes
 from app.core.seed import seed_database
@@ -29,6 +30,7 @@ settings = get_settings()
 app = FastAPI(title="KP ETSIP API", version="1.0.0", description="Local identity and quality inventory foundation", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=settings.origins, allow_credentials=False, allow_methods=["GET", "POST", "PUT", "DELETE"], allow_headers=["Authorization", "Content-Type"])
 app.include_router(identity_router, prefix="/api")
+app.include_router(portfolio_router, prefix="/api")
 
 
 @app.get("/api/health", tags=["Health"])
