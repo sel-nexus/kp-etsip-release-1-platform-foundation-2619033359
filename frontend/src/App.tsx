@@ -7,6 +7,7 @@ import ProfilePage from './auth/ProfilePage';
 import { currentUser, landingPath, signOut } from './auth/auth';
 import PortfolioPage from './portfolios/PortfolioPage';
 import ApplicationPage from './applications/ApplicationPage';
+import DashboardPage from './dashboard/DashboardPage';
 
 /** Route identity screens and restore an existing browser session. */
 function Shell() {
@@ -32,7 +33,7 @@ function Shell() {
       <header className="site-header">
         <div className="header-inner">
           <Link className="brand" to="/">KP <span>ETSIP</span></Link>
-          {user && <nav aria-label="Account">{!user.mustChangePassword && <><Link to="/portfolios">Portfolios</Link><Link to="/applications">Applications</Link></>}<Link to="/profile">My profile</Link><button className="text-button" onClick={logout}>Sign out</button></nav>}
+          {user && <nav aria-label="Account">{!user.mustChangePassword && <><Link to="/dashboard">Dashboard</Link><Link to="/portfolios">Portfolios</Link><Link to="/applications">Applications</Link></>}<Link to="/profile">My profile</Link><button className="text-button" onClick={logout}>Sign out</button></nav>}
         </div>
       </header>
       {error && <p className="global-message" role="alert">{error}</p>}
@@ -41,16 +42,12 @@ function Shell() {
         <Route path="/profile" element={user ? <ProfilePage user={user} onUpdate={setUser} /> : <Navigate to="/login" replace />} />
         <Route path="/portfolios/:id?" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <PortfolioPage user={user} /> : <Navigate to="/login" replace />} />
         <Route path="/" element={<Navigate to={user ? landingPath(user) : '/login'} replace />} />
-        <Route path="/dashboard" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <Destination title="Executive Dashboard" /> : <Navigate to="/login" replace />} />
+        <Route path="/dashboard" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <DashboardPage /> : <Navigate to="/login" replace />} />
         <Route path="/applications/:id?" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <ApplicationPage user={user} /> : <Navigate to="/login" replace />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );
-}
-/** Explain availability of the selected future destination without simulating it. */
-function Destination({ title }: { title: string }) {
-  return <main className="content"><p className="eyebrow">YOUR STARTING POINT</p><h1>{title}</h1><p>This destination is not available in the identity foundation yet.</p><Link to="/profile">Manage your profile</Link></main>;
 }
 /** Supply the application's single browser router. */
 export default function App() { return <BrowserRouter><Shell /></BrowserRouter>; }
