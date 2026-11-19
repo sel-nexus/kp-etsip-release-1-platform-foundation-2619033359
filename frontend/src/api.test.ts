@@ -20,13 +20,10 @@ describe('API client', () => {
   it('returns blob responses', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('csv data', { status: 200 }));
     const result = await api<Blob>('/export', {}, 'blob');
-    const text = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => resolve(String(reader.result));
-      reader.onerror = () => reject(reader.error);
-      reader.readAsText(result);
-    });
-    expect(text).toBe('csv data');
+    // Node's fetch Response returns a Node Blob, not jsdom's FileReader Blob.
+    // Read through the Blob interface so the byte content remains verified.
+    expect(result.size).toBe(8);
+    expect(await result.text()).toBe('csv data');
   });
   it('clears an expired session and emits session-expired on protected 401', async () => {
     sessionStorage.setItem(tokenKey, 'expired');
