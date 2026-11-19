@@ -29,3 +29,93 @@ it('shows a server error and permits retry', async () => {
   await userEvent.click(screen.getByRole('button', {name:'Retry'}));
   expect(await screen.findByText('No portfolios match these filters.')).toBeTruthy();
 });
+
+it('retains a failed create and opens the saved portfolio after retry', async () => {
+  let current = {...portfolio};
+  let fail = true;
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (init?.method === 'POST') {
+      if (fail) { fail = false; return new Response(JSON.stringify({detail:'Name already exists'}), {status:409}); }
+      current = {...current, ...JSON.parse(String(init.body))};
+      return new Response(JSON.stringify(current), {status:201});
+    }
+    if (url.includes('/applications')) return new Response(JSON.stringify({items:[], total:0, offset:0, limit:25}), {status:200});
+    return new Response(JSON.stringify(url.endsWith('/abc') ? current : {items:[portfolio], total:1, offset:0, limit:25}), {status:200});
+  });
+  const interaction = userEvent.setup();
+  mount();
+  await interaction.click(await screen.findByRole('button', {name:'Create portfolio'}));
+  await interaction.type(screen.getByLabelText('Name'), 'New portfolio');
+  await interaction.type(screen.getByLabelText('Owner'), 'New owner');
+  await interaction.click(screen.getByRole('button', {name:'Save portfolio'}));
+  expect((await screen.findByRole('alert')).textContent).toContain('Name already exists');
+  expect(screen.getByLabelText('Name')).toHaveProperty('value', 'New portfolio');
+  expect(screen.getByLabelText('Owner')).toHaveProperty('value', 'New owner');
+  await interaction.click(screen.getByRole('button', {name:'Save portfolio'}));
+  expect(await screen.findByRole('heading', {name:'New portfolio'})).toBeTruthy();
+  expect(screen.getByText('New owner')).toBeTruthy();
+  expect(screen.getByText('Portfolio saved.')).toBeTruthy();
+  const writes = fetcher.mock.calls.filter(([, init]) => init?.method === 'POST');
+  expect(writes).toHaveLength(2);
+  expect(JSON.parse(String(writes[1][1]?.body))).toMatchObject({name:'New portfolio', owner:'New owner'});
+});
+
+it('retains failed edits and reloads the updated portfolio on success', async () => {
+  let current = {...portfolio};
+  let fail = true;
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (init?.method === 'PUT') {
+      if (fail) { fail = false; return new Response(JSON.stringify({detail:'Edit rejected'}), {status:409}); }
+      current = {...current, ...JSON.parse(String(init.body))};
+      return new Response(JSON.stringify(current), {status:200});
+    }
+    if (url.includes('/applications')) return new Response(JSON.stringify({items:[], total:0, offset:0, limit:25}), {status:200});
+    return new Response(JSON.stringify(url.endsWith('/abc') ? current : {items:[portfolio], total:1, offset:0, limit:25}), {status:200});
+  });
+  const interaction = userEvent.setup();
+  mount();
+  await interaction.click(await screen.findByRole('link', {name:'Payments'}));
+  await interaction.click(await screen.findByRole('button', {name:'Edit portfolio'}));
+  await interaction.clear(screen.getByLabelText('Owner'));
+  await interaction.type(screen.getByLabelText('Owner'), 'Updated owner');
+  await interaction.click(screen.getByRole('button', {name:'Save portfolio'}));
+  expect((await screen.findByRole('alert')).textContent).toContain('Edit rejected');
+  expect(screen.getByLabelText('Owner')).toHaveProperty('value', 'Updated owner');
+  await interaction.click(screen.getByRole('button', {name:'Save portfolio'}));
+  expect(await screen.findByText('Updated owner')).toBeTruthy();
+  expect(screen.getByText('Portfolio saved.')).toBeTruthy();
+  const writes = fetcher.mock.calls.filter(([, init]) => init?.method === 'PUT');
+  expect(writes).toHaveLength(2);
+  expect(JSON.parse(String(writes[1][1]?.body))).toMatchObject({name:'Payments', owner:'Updated owner'});
+});
+
+it('does not delete on cancellation, displays failure, and returns to inventory on confirmation', async () => {
+  let exists = true;
+  let fail = true;
+  const confirm = vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValue(true);
+  const fetcher = vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
+    const url = String(input);
+    if (init?.method === 'DELETE') {
+      if (fail) { fail = false; return new Response(JSON.stringify({detail:'Portfolio is referenced'}), {status:409}); }
+      exists = false; return new Response(null, {status:204});
+    }
+    if (url.includes('/applications')) return new Response(JSON.stringify({items:[], total:0, offset:0, limit:25}), {status:200});
+    return new Response(JSON.stringify(url.endsWith('/abc') ? portfolio : {items:exists ? [portfolio] : [], total:exists ? 1 : 0, offset:0, limit:25}), {status:200});
+  });
+  const interaction = userEvent.setup();
+  mount();
+  await interaction.click(await screen.findByRole('link', {name:'Payments'}));
+  await interaction.click(await screen.findByRole('button', {name:'Delete portfolio'}));
+  expect(confirm).toHaveBeenCalled();
+  expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(0);
+  expect(screen.getByRole('heading', {name:'Payments'})).toBeTruthy();
+  await interaction.click(screen.getByRole('button', {name:'Delete portfolio'}));
+  expect((await screen.findByRole('alert')).textContent).toContain('Portfolio is referenced');
+  expect(screen.getByRole('heading', {name:'Payments'})).toBeTruthy();
+  await interaction.click(screen.getByRole('button', {name:'Delete portfolio'}));
+  expect(await screen.findByText('No portfolios match these filters.')).toBeTruthy();
+  expect(screen.getByText('Portfolio deleted.')).toBeTruthy();
+  expect(fetcher.mock.calls.filter(([, init]) => init?.method === 'DELETE')).toHaveLength(2);
+});

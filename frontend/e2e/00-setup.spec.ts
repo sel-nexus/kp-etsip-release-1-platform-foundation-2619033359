@@ -1,0 +1,32 @@
+import { test, expect } from '@playwright/test';
+
+test('fresh administrator must change the initial password before accessing inventory', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/login');
+  await page.getByLabel('Email').fill('admin@ketsip.local');
+  await page.getByLabel('Password').fill(process.env.E2E_ADMIN_INITIAL_PASSWORD ?? 'E2eInitialAdmin123!');
+  const login = page.waitForResponse(response => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  const response = await login;
+  expect(response.status()).toBe(200);
+  const session = await response.json();
+  expect(session.user.mustChangePassword).toBe(true);
+  await expect(page.getByText('Change your initial password before continuing.')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Dashboard' })).toHaveCount(0);
+  const denied = await page.request.get('/api/dashboard/executive', { headers: { Authorization: `Bearer ${session.token}` } });
+  expect(denied.status()).toBe(403);
+  await page.getByLabel('Current password').fill(process.env.E2E_ADMIN_INITIAL_PASSWORD ?? 'E2eInitialAdmin123!');
+  await page.getByLabel('New password').fill(process.env.E2E_ADMIN_PASSWORD ?? 'LocalAdmin123!');
+  const changed = page.waitForResponse(response => response.url().endsWith('/api/profile/password') && response.request().method() === 'PUT');
+  await page.getByRole('button', { name: 'Update password' }).click();
+  const result = await changed;
+  expect(result.status()).toBe(200);
+  expect((await result.json()).user.mustChangePassword).toBe(false);
+  await expect(page.getByText('Password updated.')).toBeVisible();
+  await page.getByRole('link', { name: 'Dashboard' }).click();
+  await expect(page.getByRole('heading', { name: 'Executive Dashboard' })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('first-login-dashboard.png'), fullPage: true });
+  expect(errors).toEqual([]);
+});

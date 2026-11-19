@@ -97,8 +97,6 @@ async def save_user(repo: AdminRepository, actor: dict, fields: dict, value: str
         await repo.audit(actor, 'create' if old is None else 'edit', 'user', doc['_id'])
         if old and old['role'] != doc['role']:
             await repo.audit(actor, 'roleChange', 'user', doc['_id'])
-        if old and old['status'] == 'Active' and doc['status'] == 'Inactive':
-            await repo.audit(actor, 'deactivate', 'user', doc['_id'])
         return doc
 
 
@@ -117,7 +115,7 @@ async def deactivate(repo: AdminRepository, actor: dict, value: str) -> None:
         doc = await repo.update_user(old, {'status': 'Inactive'}, True)
         if not doc:
             raise HTTPException(409, 'Account changed; reload and try again')
-        await repo.audit(actor, 'deactivate', 'user', doc['_id'])
+        await repo.audit(actor, 'delete', 'user', doc['_id'])
 
 
 def validate_role(fields: dict) -> None:

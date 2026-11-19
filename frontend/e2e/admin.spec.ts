@@ -1,5 +1,60 @@
 import { test, expect } from '@playwright/test';
 
+test('administrator changes a role permission and the change persists', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(process.env.E2E_ADMIN_EMAIL ?? 'admin@ketsip.local');
+  await page.getByLabel('Password').fill(process.env.E2E_ADMIN_PASSWORD ?? 'LocalAdmin123!');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  const rolesResponse = page.waitForResponse(response => response.url().includes('/api/roles?') && response.status() === 200);
+  await page.getByRole('link', { name: 'Administration' }).click();
+  const roles = await (await rolesResponse).json();
+  const role = roles.items.find((item: { name: string }) => item.name === 'Executive');
+  expect(role).toBeDefined();
+  expect(role.permissions).toContain('export');
+  const token = await page.evaluate(() => sessionStorage.getItem('kp-etsip-token'));
+  try {
+    await page.getByRole('button', { name: 'Roles', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Executive permissions' }).click();
+    await page.getByRole('checkbox', { name: 'export' }).uncheck();
+    const saved = page.waitForResponse(response => response.url().endsWith(`/api/roles/${role.id}`) && response.request().method() === 'PUT');
+    await page.getByRole('button', { name: 'Save role' }).click();
+    const response = await saved;
+    expect(response.status()).toBe(200);
+    expect((await response.json()).permissions).not.toContain('export');
+    await expect(page.getByText('Role saved.')).toBeVisible();
+    await page.reload();
+    await page.getByRole('button', { name: 'Roles', exact: true }).click();
+    await page.getByRole('button', { name: 'Edit Executive permissions' }).click();
+    await expect(page.getByRole('checkbox', { name: 'export' })).not.toBeChecked();
+    await page.screenshot({ path: testInfo.outputPath('role-permissions.png'), fullPage: true });
+  } finally {
+    const restored = await page.request.put(`/api/roles/${role.id}`, { headers: { Authorization: `Bearer ${token}` }, data: { name: role.name, description: role.description, permissions: role.permissions } });
+    expect(restored.status()).toBe(200);
+  }
+  expect(errors).toEqual([]);
+});
+
+test('administrator receives a visible validation error for a whitespace-only user name', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(process.env.E2E_ADMIN_EMAIL ?? 'admin@ketsip.local');
+  await page.getByLabel('Password').fill(process.env.E2E_ADMIN_PASSWORD ?? 'LocalAdmin123!');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('link', { name: 'Administration' }).click();
+  await page.getByRole('button', { name: 'Create user' }).click();
+  await page.getByLabel('Name', { exact: true }).fill('   ');
+  await page.getByLabel('Email', { exact: true }).fill('invalid-name@example.com');
+  await page.getByLabel('Password', { exact: true }).fill('TemporaryPassword123!');
+  await page.getByRole('button', { name: 'Save user' }).click();
+  await expect(page.getByRole('alert')).toContainText('Enter a name and a password');
+  expect(errors).toEqual([]);
+});
+
 test('administrator creates, edits and deactivates an account using the live API', async ({ page }) => {
   const errors: string[] = [];
   page.on('pageerror', error => errors.push(error.message));

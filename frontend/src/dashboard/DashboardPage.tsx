@@ -75,12 +75,17 @@ export default function DashboardPage() {
         <label htmlFor="dashboard-risk">Risk level
           <select id="dashboard-risk" value={params.get('riskLevel') ?? ''} onChange={event => filter('riskLevel', event.target.value)}>
             <option value="">All risk levels</option>
-            <option>Low</option><option>Medium</option><option>High</option>
+            <option>Low</option>
+            <option>Medium</option>
+            <option>High</option>
           </select>
         </label>
       </section>
       {loading && <p role="status">Loading dashboard…</p>}
-      {error && <div role="alert"><p className="error">{error}</p><button type="button" onClick={() => setRevision(value => value + 1)}>Retry</button></div>}
+      {error && <div role="alert">
+        <p className="error">{error}</p>
+        <button type="button" onClick={() => setRevision(value => value + 1)}>Retry</button>
+      </div>}
       {data && (
         <>
           {data.totalApplications === 0 && <p role="status" className="mt-6">No applications match these filters.</p>}
@@ -99,8 +104,13 @@ export default function DashboardPage() {
                 <ul>
                   {data.portfolios.map(item => (
                     <li key={item.portfolioId} className="py-3">
-                      <div className="flex justify-between gap-4"><span>{item.name}</span><strong>{item.qualityScore ?? 'Unavailable'}</strong></div>
-                      {item.qualityScore !== null && <div className="h-2 bg-surface-container mt-2" aria-hidden="true"><div className="h-full bg-primary" style={{ width: `${item.qualityScore}%` }} /></div>}
+                      <div className="flex justify-between gap-4">
+                        <span>{item.name}</span>
+                        <strong>{item.qualityScore ?? 'Unavailable'}</strong>
+                      </div>
+                      {item.qualityScore !== null && <div className="h-2 bg-surface-container mt-2" aria-hidden="true">
+                        <div className="h-full bg-primary" style={{ width: `${item.qualityScore}%` }} />
+                      </div>}
                     </li>
                   ))}
                 </ul>
@@ -110,8 +120,13 @@ export default function DashboardPage() {
                 <ul>
                   {data.portfolios.map(item => (
                     <li key={item.portfolioId} className="py-3">
-                      <div className="flex justify-between gap-4"><span>{item.name}</span><strong>{item.applicationsAtRisk}</strong></div>
-                      <div className="h-2 bg-surface-container mt-2" aria-hidden="true"><div className="h-full bg-primary" style={{ width: `${item.applicationsAtRisk / maxRisk * 100}%` }} /></div>
+                      <div className="flex justify-between gap-4">
+                        <span>{item.name}</span>
+                        <strong>{item.applicationsAtRisk}</strong>
+                      </div>
+                      <div className="h-2 bg-surface-container mt-2" aria-hidden="true">
+                        <div className="h-full bg-primary" style={{ width: `${item.applicationsAtRisk / maxRisk * 100}%` }} />
+                      </div>
                     </li>
                   ))}
                 </ul>

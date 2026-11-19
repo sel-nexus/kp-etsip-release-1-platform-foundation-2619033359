@@ -111,42 +111,256 @@ export default function ApplicationPage({ user }: { user: User }) {
     <main className="content">
       <p className="eyebrow">INVENTORY</p>
       <h1>{id ? 'Application detail' : 'Application Repository'}</h1>
-      {id && <p><Link to="/applications">Back to applications</Link></p>}
-      {notice && <p role="status" className="success">{notice}</p>}
-      {error && <p role="alert" className="error">{error}</p>}
+      {id && (
+        <p>
+          <Link to="/applications">Back to applications</Link>
+        </p>
+      )}
+      {notice && (
+        <p role="status" className="success">
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p role="alert" className="error">
+          {error}
+        </p>
+      )}
       {loading && <p role="status">Loading applications…</p>}
-      {!loading && error && <button type="button" onClick={() => setRevision(value => value + 1)}>Retry</button>}
-      {!id && !editing && !loading && canCreate && <button type="button" onClick={() => startEdit()}>Create application</button>}
-      {!id && !editing && !loading && permissions.export && <button type="button" disabled={saving} onClick={exportCsv}>Export CSV</button>}
+      {!loading && error && (
+        <button type="button" onClick={() => setRevision((value) => value + 1)}>
+          Retry
+        </button>
+      )}
+      {!id && !editing && !loading && canCreate && (
+        <button type="button" onClick={() => startEdit()}>
+          Create application
+        </button>
+      )}
+      {!id && !editing && !loading && permissions.export && (
+        <button type="button" disabled={saving} onClick={exportCsv}>
+          Export CSV
+        </button>
+      )}
       {!id && !editing && (
         <section aria-label="Application filters" className="mt-6 grid gap-4 md:grid-cols-3">
-          <label>Search<input value={params.get('search') ?? ''} onChange={event => filter('search', event.target.value)} /></label>
-          <label>Portfolio<select value={params.get('portfolioId') ?? ''} onChange={event => filter('portfolioId', event.target.value)}><option value="">All portfolios</option>{portfolios.map(portfolio => <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>)}</select></label>
-          {choices.map(([key, label, options]) => <label key={key}>{label}<select value={params.get(key) ?? ''} onChange={event => filter(key, event.target.value)}><option value="">All {label.toLowerCase()} values</option>{options.map(option => <option key={option}>{option}</option>)}</select></label>)}
+          <label>
+            Search
+            <input
+              value={params.get('search') ?? ''}
+              onChange={(event) => filter('search', event.target.value)}
+            />
+          </label>
+          <label>
+            Portfolio
+            <select
+              value={params.get('portfolioId') ?? ''}
+              onChange={(event) => filter('portfolioId', event.target.value)}
+            >
+              <option value="">All portfolios</option>
+              {portfolios.map((portfolio) => (
+                <option key={portfolio.id} value={portfolio.id}>
+                  {portfolio.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {choices.map(([key, label, options]) => (
+            <label key={key}>
+              {label}
+              <select
+                value={params.get(key) ?? ''}
+                onChange={(event) => filter(key, event.target.value)}
+              >
+                <option value="">All {label.toLowerCase()} values</option>
+                {options.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+          ))}
         </section>
       )}
       {editing && (
         <form onSubmit={save} className="card max-w-2xl">
           <h2>{id ? 'Edit application' : 'Create application'}</h2>
-          {textFields.map(([key, label]) => <label key={key}>{label}<input type={key.endsWith('Link') ? 'url' : 'text'} required={key === 'name'} value={String(fields[key] ?? '')} onChange={event => setFields({ ...fields, [key]: event.target.value || (key.endsWith('Link') ? null : '') })} /></label>)}
-          <label>Portfolio<select required value={fields.portfolioId} onChange={event => setFields({ ...fields, portfolioId: event.target.value })}><option value="">Select portfolio</option>{portfolios.map(portfolio => <option key={portfolio.id} value={portfolio.id}>{portfolio.name}</option>)}</select></label>
-          {choices.map(([key, label, options]) => <label key={key}>{label}<select value={String(fields[key])} onChange={event => setFields({ ...fields, [key]: event.target.value })}>{options.map(option => <option key={option}>{option}</option>)}</select></label>)}
-          {numberFields.map(([key, label, max]) => <label key={key}>{label}<input type="number" required min={key === 'tier' ? 1 : 0} max={max} step={1} value={String(fields[key])} onChange={event => setFields({ ...fields, [key]: event.target.value === '' ? '' : Number(event.target.value) })} /></label>)}
-          <div className="flex gap-4"><button disabled={saving}>Save application</button><button type="button" className="text-button" onClick={() => setEditing(false)}>Cancel</button></div>
+          {textFields.map(([key, label]) => (
+            <label key={key}>
+              {label}
+              <input
+                type={key.endsWith('Link') ? 'url' : 'text'}
+                required={key === 'name'}
+                value={String(fields[key] ?? '')}
+                onChange={(event) =>
+                  setFields({
+                    ...fields,
+                    [key]: event.target.value || (key.endsWith('Link') ? null : ''),
+                  })
+                }
+              />
+            </label>
+          ))}
+          <label>
+            Portfolio
+            <select
+              required
+              value={fields.portfolioId}
+              onChange={(event) => setFields({ ...fields, portfolioId: event.target.value })}
+            >
+              <option value="">Select portfolio</option>
+              {portfolios.map((portfolio) => (
+                <option key={portfolio.id} value={portfolio.id}>
+                  {portfolio.name}
+                </option>
+              ))}
+            </select>
+          </label>
+          {choices.map(([key, label, options]) => (
+            <label key={key}>
+              {label}
+              <select
+                value={String(fields[key])}
+                onChange={(event) => setFields({ ...fields, [key]: event.target.value })}
+              >
+                {options.map((option) => (
+                  <option key={option}>{option}</option>
+                ))}
+              </select>
+            </label>
+          ))}
+          {numberFields.map(([key, label, max]) => (
+            <label key={key}>
+              {label}
+              <input
+                type="number"
+                required
+                min={key === 'tier' ? 1 : 0}
+                max={max}
+                step={1}
+                value={String(fields[key])}
+                onChange={(event) =>
+                  setFields({
+                    ...fields,
+                    [key]: event.target.value === '' ? '' : Number(event.target.value),
+                  })
+                }
+              />
+            </label>
+          ))}
+          <div className="flex gap-4">
+            <button disabled={saving}>Save application</button>
+            <button type="button" className="text-button" onClick={() => setEditing(false)}>
+              Cancel
+            </button>
+          </div>
         </form>
       )}
       {!id && !editing && page && (
         <section className="mt-8" aria-label="Application results">
           <p>{page.total} applications</p>
-          {page.items.length === 0 ? <p>No applications match these filters.</p> : <div className="overflow-x-auto"><table className="w-full text-left"><thead><tr>{['Name', 'Portfolio', 'Criticality', 'Tier', 'Lifecycle status', 'Health score', 'Automation coverage %', 'Open critical defects', 'Risk level'].map(label => <th className="p-3 border-b border-outline-variant" scope="col" key={label}>{label}</th>)}</tr></thead><tbody>{page.items.map(app => <tr key={app.id}><td className="p-3"><Link to={`/applications/${app.id}`}>{app.name}</Link></td><td className="p-3">{portfolioName(app.portfolioId)}</td><td className="p-3">{app.criticality}</td><td className="p-3">{app.tier}</td><td className="p-3">{app.lifecycleStatus}</td><td className="p-3">{app.applicationHealthScore}</td><td className="p-3">{app.automationCoverage}%</td><td className="p-3">{app.openCriticalDefects}</td><td className="p-3">{app.riskLevel}</td></tr>)}</tbody></table></div>}
-          <div className="flex gap-4 mt-6"><button disabled={page.offset === 0} onClick={() => filter('offset', String(Math.max(0, page.offset - page.limit)))}>Previous</button><button disabled={page.offset + page.limit >= page.total} onClick={() => filter('offset', String(page.offset + page.limit))}>Next</button></div>
+          {page.items.length === 0 ? (
+            <p>No applications match these filters.</p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr>
+                    {[
+                      'Name',
+                      'Portfolio',
+                      'Criticality',
+                      'Tier',
+                      'Lifecycle status',
+                      'Health score',
+                      'Automation coverage %',
+                      'Open critical defects',
+                      'Risk level',
+                    ].map((label) => (
+                      <th className="p-3 border-b border-outline-variant" scope="col" key={label}>
+                        {label}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {page.items.map((app) => (
+                    <tr key={app.id}>
+                      <td className="p-3">
+                        <Link to={`/applications/${app.id}`}>{app.name}</Link>
+                      </td>
+                      <td className="p-3">{portfolioName(app.portfolioId)}</td>
+                      <td className="p-3">{app.criticality}</td>
+                      <td className="p-3">{app.tier}</td>
+                      <td className="p-3">{app.lifecycleStatus}</td>
+                      <td className="p-3">{app.applicationHealthScore}</td>
+                      <td className="p-3">{app.automationCoverage}%</td>
+                      <td className="p-3">{app.openCriticalDefects}</td>
+                      <td className="p-3">{app.riskLevel}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          <div className="flex gap-4 mt-6">
+            <button
+              disabled={page.offset === 0}
+              onClick={() => filter('offset', String(Math.max(0, page.offset - page.limit)))}
+            >
+              Previous
+            </button>
+            <button
+              disabled={page.offset + page.limit >= page.total}
+              onClick={() => filter('offset', String(page.offset + page.limit))}
+            >
+              Next
+            </button>
+          </div>
         </section>
       )}
       {id && detail && !editing && (
         <section className="mt-8">
           <h2>{detail.name}</h2>
-          <dl><dt>Portfolio</dt><dd>{portfolioName(detail.portfolioId)}</dd>{textFields.filter(([key]) => key !== 'name').map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{key.endsWith('Link') && detail[key] ? <a href={String(detail[key])} target="_blank" rel="noreferrer">{String(detail[key])}</a> : String(detail[key] || 'Not specified')}</dd></div>)}{choices.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{String(detail[key])}</dd></div>)}{numberFields.map(([key, label]) => <div key={key}><dt>{label}</dt><dd>{String(detail[key])}</dd></div>)}</dl>
-          <div className="flex gap-4 mt-6">{canEdit && <button onClick={() => startEdit(detail)}>Edit application</button>}{permissions.delete && <button disabled={saving} onClick={remove}>Delete application</button>}</div>
+          <dl>
+            <dt>Portfolio</dt>
+            <dd>{portfolioName(detail.portfolioId)}</dd>
+            {textFields
+              .filter(([key]) => key !== 'name')
+              .map(([key, label]) => (
+                <div key={key}>
+                  <dt>{label}</dt>
+                  <dd>
+                    {key.endsWith('Link') && detail[key] ? (
+                      <a href={String(detail[key])} target="_blank" rel="noreferrer">
+                        {String(detail[key])}
+                      </a>
+                    ) : (
+                      String(detail[key] || 'Not specified')
+                    )}
+                  </dd>
+                </div>
+              ))}
+            {choices.map(([key, label]) => (
+              <div key={key}>
+                <dt>{label}</dt>
+                <dd>{String(detail[key])}</dd>
+              </div>
+            ))}
+            {numberFields.map(([key, label]) => (
+              <div key={key}>
+                <dt>{label}</dt>
+                <dd>{String(detail[key])}</dd>
+              </div>
+            ))}
+          </dl>
+          <div className="flex gap-4 mt-6">
+            {canEdit && <button onClick={() => startEdit(detail)}>Edit application</button>}
+            {permissions.delete && (
+              <button disabled={saving} onClick={remove}>
+                Delete application
+              </button>
+            )}
+          </div>
         </section>
       )}
     </main>

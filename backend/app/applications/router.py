@@ -1,5 +1,4 @@
 """Expose scoped application inventory endpoints."""
-import csv
 import io
 from typing import Annotated
 from fastapi import APIRouter, Depends, Query, Response
@@ -7,6 +6,7 @@ from pymongo.asynchronous.database import AsyncDatabase
 from app.applications import service
 from app.applications.repository import ApplicationRepository
 from app.applications.schemas import Application, ApplicationInput, ApplicationPage, Criticality, Lifecycle, Risk
+from app.audit.service import csv_line
 from app.core.database import get_database
 from app.core.security import require_ready_user
 
@@ -41,19 +41,12 @@ async def export_applications(db: DB, user: User, search: str = "", portfolioId:
     await service.authorize(repo, user, "export", portfolioId)
     output = io.StringIO(newline="")
     columns = ['name', 'portfolioId', 'criticality', 'tier', 'lifecycleStatus', 'applicationHealthScore', 'automationCoverage', 'openCriticalDefects', 'riskLevel']
-    writer = csv.writer(output)
-    writer.writerow(columns)
+    output.write(csv_line(columns))
     offset = 0
     while True:
         page = await service.list_applications(repo, user, search, portfolioId, criticality, riskLevel, lifecycleStatus, 100, offset)
         for item in page['items']:
-            row = []
-            for column in columns:
-                value = item.get(column, '')
-                if isinstance(value, str) and value.lstrip().startswith(('=', '+', '-', '@', '\t', '\r')):
-                    value = "'" + value
-                row.append(value)
-            writer.writerow(row)
+            output.write(csv_line([item.get(column, '') for column in columns]))
         offset += len(page['items'])
         if not page['items'] or offset >= page['total']:
             break

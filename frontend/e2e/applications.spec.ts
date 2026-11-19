@@ -7,7 +7,7 @@ test('engineer creates, filters, edits and reloads an application from the real 
   const name = `E2E Application ${Date.now()}`;
   await page.goto('/login');
   await page.getByLabel('Email').fill(process.env.E2E_ENGINEER_EMAIL ?? 'engineer@ketsip.local');
-  await page.getByLabel('Password').fill(process.env.E2E_ENGINEER_PASSWORD ?? 'LocalDemo123!');
+  await page.getByLabel('Password').fill(process.env.E2E_ENGINEER_PASSWORD ?? process.env.E2E_DEMO_PASSWORD ?? 'LocalDemo123!');
   await page.getByRole('button', {name:'Sign in'}).click();
   await page.getByRole('link', {name:'Applications'}).click();
   await page.getByRole('button', {name:'Create application'}).click();

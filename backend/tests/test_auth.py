@@ -77,13 +77,17 @@ async def test_login_audit_and_seed_are_real(client):
 
 async def test_auth_boundaries_and_validation(client):
     """Reject missing, malformed, forged, and inactive identities."""
-    assert (await client.get('/api/health')).json() == {'status': 'ok'}
+    _response = await client.get('/api/health')
+    assert _response.status_code == 200
+    assert (_response).json() == {'status': 'ok'}
     for token in ['', 'nonsense', jwt.encode({'sub':'bad','userId':'bad','role':'Administrator','exp':1}, get_settings().JWT_SECRET, algorithm='HS256')]:
         assert (await client.get('/api/auth/me', headers=headers(token))).status_code == 401
     assert (await client.post('/api/auth/logout')).status_code == 401
     assert (await client.put('/api/profile/preferences', json={'defaultLandingPage':'dashboard'})).status_code == 401
     assert (await client.post('/api/auth/login', json={'email':{'$ne':''}, 'password':'anything'})).status_code == 422
-    token = (await authenticate(client)).json()['token']
+    _response = await authenticate(client)
+    assert _response.status_code == 200
+    token = (_response).json()['token']
     await app.state.db.users.update_one({'email':'engineer@ketsip.local'}, {'$set':{'status':'Inactive'}})
     assert (await client.get('/api/auth/me', headers=headers(token))).status_code == 401
     assert (await authenticate(client)).status_code == 401
@@ -92,6 +96,7 @@ async def test_auth_boundaries_and_validation(client):
 async def test_admin_password_gate_change_and_revocation(client):
     """Enforce first password change and invalidate old tokens."""
     result = await authenticate(client, 'admin@ketsip.local', 'TestAdmin123!')
+    assert result.status_code == 200
     old = result.json()['token']
     assert result.json()['user']['mustChangePassword'] is True
     assert (await client.get('/api/auth/me', headers=headers(old))).status_code == 200
@@ -108,9 +113,63 @@ async def test_admin_password_gate_change_and_revocation(client):
 
 async def test_preferences_persist_and_validate(client):
     """Save the landing page and reject unsupported destinations."""
-    token = (await authenticate(client)).json()['token']
+    _response = await authenticate(client)
+    assert _response.status_code == 200
+    token = (_response).json()['token']
     assert (await client.put('/api/profile/preferences', headers=headers(token), json={'defaultLandingPage':'other'})).status_code == 422
     saved = await client.put('/api/profile/preferences', headers=headers(token), json={'defaultLandingPage':'dashboard'})
     assert saved.status_code == 200 and saved.json()['defaultLandingPage'] == 'dashboard'
-    assert (await client.get('/api/auth/me', headers=headers(token))).json()['defaultLandingPage'] == 'dashboard'
+    _response = await client.get('/api/auth/me', headers=headers(token))
+    assert _response.status_code == 200
+    assert (_response).json()['defaultLandingPage'] == 'dashboard'
     assert (await app.state.db.users.find_one({'email':'engineer@ketsip.local'}))['defaultLandingPage'] == 'dashboard'
+
+
+async def test_same_password_and_stale_updates_do_not_change_state(client):
+    """Reject identical passwords and stale optimistic writes without audit events."""
+    from fastapi import HTTPException
+    from app.auth.repository import IdentityRepository
+    from app.auth.service import change_password, change_preferences
+    db = app.state.db
+    _response = await authenticate(client)
+    assert _response.status_code == 200
+    token = (_response).json()['token']
+    before = await db.users.find_one({'email': 'engineer@ketsip.local'})
+    events = await db.audit_logs.count_documents({})
+    response = await client.put('/api/profile/password', headers=headers(token), json={'currentPassword': 'TestDemo123!', 'newPassword': 'TestDemo123!'})
+    assert response.status_code == 400
+    assert await db.users.find_one({'_id': before['_id']}) == before
+    assert await db.audit_logs.count_documents({}) == events
+    await db.users.update_one({'_id': before['_id']}, {'$inc': {'tokenVersion': 1}})
+    repo = IdentityRepository(db)
+    for operation in (change_password(repo, before, 'TestDemo123!', 'DifferentPassword123!'), change_preferences(repo, before, 'dashboard')):
+        with pytest.raises(HTTPException) as error:
+            await operation
+        assert error.value.status_code == 409
+    after = await db.users.find_one({'_id': before['_id']})
+    assert after['passwordHash'] == before['passwordHash'] and after['defaultLandingPage'] == before['defaultLandingPage']
+    assert after['tokenVersion'] == before['tokenVersion'] + 1
+    assert await db.audit_logs.count_documents({}) == events
+
+
+async def test_login_and_profile_field_validation_preserves_state(client):
+    """Reject malformed required credentials and preferences without writes or audit."""
+    result = await authenticate(client)
+    assert result.status_code == 200
+    auth = headers(result.json()['token'])
+    db = app.state.db
+    before = await db.users.find({}).sort('_id', 1).to_list(None)
+    audit_count = await db.audit_logs.count_documents({})
+    for path, valid, limits in (
+        ('/api/auth/login', {'email': 'engineer@ketsip.local', 'password': 'TestDemo123!'}, {'email': 254, 'password': 256}),
+        ('/api/profile/password', {'currentPassword': 'TestDemo123!', 'newPassword': 'DifferentPassword123!'}, {'currentPassword': 256, 'newPassword': 72}),
+        ('/api/profile/preferences', {'defaultLandingPage': 'dashboard'}, {'defaultLandingPage': 256}),
+    ):
+        for key, maximum in limits.items():
+            bodies = [{k: v for k, v in valid.items() if k != key}]
+            bodies += [{**valid, key: value} for value in (None, {}, '', 'x' * (maximum + 1))]
+            for body in bodies:
+                response = await (client.post(path, json=body) if path.endswith('/login') else client.put(path, headers=auth, json=body))
+                assert response.status_code == 422, (path, key, body, response.text)
+                assert await db.users.find({}).sort('_id', 1).to_list(None) == before
+                assert await db.audit_logs.count_documents({}) == audit_count

@@ -9,8 +9,9 @@ test('executive views and filters real dashboard measures', async ({ page }) => 
   await page.getByLabel('Password').fill(process.env.E2E_DEMO_PASSWORD ?? 'LocalDemo123!');
   await page.getByRole('button', { name: 'Sign in' }).click();
   await expect(page.getByRole('link', { name: 'Dashboard' })).toBeVisible();
+  await page.getByRole('link', { name: 'Applications' }).click();
   const initialResponse = page.waitForResponse(response => response.url().includes('/api/dashboard/executive') && response.status() === 200);
-  await page.goto('/dashboard');
+  await page.getByRole('link', { name: 'Dashboard' }).click();
   const initial = await (await initialResponse).json();
   await expect(page.getByRole('heading', { name: 'Executive Dashboard' })).toBeVisible();
   const metrics = page.getByRole('region', { name: 'Executive metrics' });

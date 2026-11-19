@@ -3,5 +3,5 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
-  return { plugins: [react()], server: { port: 5173, proxy: { '/api': { target: env.DEV_API_PROXY, changeOrigin: true } } }, test: { environment: 'jsdom', include: ['src/**/*.test.tsx'] } };
+  return { plugins: [react()], server: { port: 5173, proxy: { '/api': { target: env.DEV_API_PROXY, changeOrigin: true } } }, test: { environment: 'jsdom', include: ['src/**/*.test.{ts,tsx}'] } };
 });

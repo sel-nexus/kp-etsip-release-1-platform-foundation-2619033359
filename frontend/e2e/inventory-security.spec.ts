@@ -1,0 +1,65 @@
+import { test, expect } from '@playwright/test';
+
+test('portfolio detail drills into a real application and shows loading while its API is pending', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  await page.goto('/login');
+  await page.getByLabel('Email').fill('executive@ketsip.local');
+  await page.getByLabel('Password').fill(process.env.E2E_DEMO_PASSWORD ?? 'LocalDemo123!');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await expect(page.getByRole('link', { name: 'Portfolios' })).toBeVisible();
+  // Hold the real request, then continue it unchanged; no response is fabricated.
+  let release!: () => void;
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  let requested!: () => void;
+  const pending = new Promise<void>(resolve => { requested = resolve; });
+  await page.route('**/api/portfolios', async route => { requested(); await gate; await route.continue(); });
+  await page.getByRole('link', { name: 'Portfolios' }).click();
+  await pending;
+  await expect(page.getByText('Loading portfolios…')).toBeVisible();
+  const response = page.waitForResponse(result => result.url().endsWith('/api/portfolios') && result.status() === 200);
+  release();
+  const list = await (await response).json();
+  const payments = list.items.find((item: { name: string }) => item.name === 'Payments');
+  expect(payments).toBeDefined();
+  const appsResponse = page.waitForResponse(result => result.url().includes(`/api/portfolios/${payments.id}/applications`) && result.status() === 200);
+  await page.getByRole('link', { name: payments.name, exact: true }).click();
+  const apps = await (await appsResponse).json();
+  expect(apps.items.length).toBeGreaterThan(0);
+  await page.getByRole('link', { name: apps.items[0].name, exact: true }).click();
+  await expect(page.getByRole('heading', { name: apps.items[0].name, exact: true })).toBeVisible();
+  await page.screenshot({ path: testInfo.outputPath('portfolio-drilldown.png'), fullPage: true });
+  expect(errors).toEqual([]);
+});
+
+test('stored markup is rendered as inert text in a portfolio', async ({ page }, testInfo) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  const payload = '<img src=x onerror="window.__storedXss=1">';
+  const name = `XSS portfolio ${Date.now()}`;
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(process.env.E2E_ADMIN_EMAIL ?? 'admin@ketsip.local');
+  await page.getByLabel('Password').fill(process.env.E2E_ADMIN_PASSWORD ?? 'LocalAdmin123!');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  await page.getByRole('link', { name: 'Portfolios' }).click();
+  await page.getByRole('button', { name: 'Create portfolio' }).click();
+  await page.getByLabel('Name', { exact: true }).fill(name);
+  await page.getByLabel('Description').fill(payload);
+  const created = page.waitForResponse(response => response.url().endsWith('/api/portfolios') && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Save portfolio' }).click();
+  const response = await created;
+  expect(response.status()).toBe(201);
+  expect((await response.json()).description).toBe(payload);
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText(payload, { exact: true })).toBeVisible();
+  expect(await page.locator('main img').count()).toBe(0);
+  expect(await page.evaluate(() => (window as unknown as { __storedXss?: number }).__storedXss)).toBeUndefined();
+  await page.screenshot({ path: testInfo.outputPath('stored-xss.png'), fullPage: true });
+  page.once('dialog', dialog => dialog.accept());
+  await page.getByRole('button', { name: 'Delete portfolio' }).click();
+  await expect(page.getByText('Portfolio deleted.')).toBeVisible();
+  expect(errors).toEqual([]);
+});

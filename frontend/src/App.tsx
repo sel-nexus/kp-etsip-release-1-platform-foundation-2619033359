@@ -30,30 +30,152 @@ function Shell() {
     finally { setUser(null); navigate('/login'); }
   }
   if (loading) return <main className="content" role="status">Restoring session…</main>;
-  const login = <LoginPage onLogin={u => { setError(''); setUser(u); navigate(landingPath(u)); }} />;
+  const login = (
+    <LoginPage
+      onLogin={(u) => {
+        setError('');
+        setUser(u);
+        navigate(landingPath(u));
+      }}
+    />
+  );
   return (
     <>
       <header className="site-header">
         <div className="header-inner">
-          <Link className="brand" to="/">KP <span>ETSIP</span></Link>
-          {user && <nav aria-label="Account">{!user.mustChangePassword && <><Link to="/dashboard">Dashboard</Link><Link to="/portfolios">Portfolios</Link><Link to="/applications">Applications</Link><Link to="/reports">Reports</Link>{(user.role === 'Administrator' || user.role === 'Auditor') && <Link to="/audit">Audit log</Link>}{user.role === 'Administrator' && <Link to="/admin">Administration</Link>}</>}<Link to="/profile">My profile</Link><button className="text-button" onClick={logout}>Sign out</button></nav>}
+          <Link className="brand" to="/">
+            KP <span>ETSIP</span>
+          </Link>
+          {user && (
+            <nav aria-label="Account">
+              {!user.mustChangePassword && (
+                <>
+                  <Link to="/dashboard">Dashboard</Link>
+                  <Link to="/portfolios">Portfolios</Link>
+                  <Link to="/applications">Applications</Link>
+                  <Link to="/reports">Reports</Link>
+                  {(user.role === 'Administrator' || user.role === 'Auditor') && (
+                    <Link to="/audit">Audit log</Link>
+                  )}
+                  {user.role === 'Administrator' && <Link to="/admin">Administration</Link>}
+                </>
+              )}
+              <Link to="/profile">My profile</Link>
+              <button className="text-button" onClick={logout}>
+                Sign out
+              </button>
+            </nav>
+          )}
         </div>
       </header>
-      {error && <p className="global-message" role="alert">{error}</p>}
+      {error && (
+        <p className="global-message" role="alert">
+          {error}
+        </p>
+      )}
       <Routes>
         <Route path="/login" element={user ? <Navigate to={landingPath(user)} replace /> : login} />
-        <Route path="/profile" element={user ? <ProfilePage user={user} onUpdate={setUser} /> : <Navigate to="/login" replace />} />
-        <Route path="/portfolios/:id?" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <PortfolioPage user={user} /> : <Navigate to="/login" replace />} />
+        <Route
+          path="/profile"
+          element={
+            user ? <ProfilePage user={user} onUpdate={setUser} /> : <Navigate to="/login" replace />
+          }
+        />
+        <Route
+          path="/portfolios/:id?"
+          element={
+            user ? (
+              user.mustChangePassword ? (
+                <Navigate to="/profile" replace />
+              ) : (
+                <PortfolioPage user={user} />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
         <Route path="/" element={<Navigate to={user ? landingPath(user) : '/login'} replace />} />
-        <Route path="/dashboard" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <DashboardPage /> : <Navigate to="/login" replace />} />
-        <Route path="/applications/:id?" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <ApplicationPage user={user} /> : <Navigate to="/login" replace />} />
-        <Route path="/reports" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <ReportsPage /> : <Navigate to="/login" replace />} />
-        <Route path="/audit" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <AuditPage user={user} /> : <Navigate to="/login" replace />} />
-        <Route path="/admin" element={user ? user.mustChangePassword ? <Navigate to="/profile" replace /> : <AdminPage user={user} /> : <Navigate to="/login" replace />} />
+        <Route
+          path="/dashboard"
+          element={
+            user ? (
+              user.mustChangePassword ? (
+                <Navigate to="/profile" replace />
+              ) : (
+                <DashboardPage />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/applications/:id?"
+          element={
+            user ? (
+              user.mustChangePassword ? (
+                <Navigate to="/profile" replace />
+              ) : (
+                <ApplicationPage user={user} />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/reports"
+          element={
+            user ? (
+              user.mustChangePassword ? (
+                <Navigate to="/profile" replace />
+              ) : (
+                <ReportsPage />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/audit"
+          element={
+            user ? (
+              user.mustChangePassword ? (
+                <Navigate to="/profile" replace />
+              ) : (
+                <AuditPage user={user} />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
+        <Route
+          path="/admin"
+          element={
+            user ? (
+              user.mustChangePassword ? (
+                <Navigate to="/profile" replace />
+              ) : (
+                <AdminPage user={user} />
+              )
+            ) : (
+              <Navigate to="/login" replace />
+            )
+          }
+        />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>
   );
 }
 /** Supply the application's single browser router. */
-export default function App() { return <BrowserRouter><Shell /></BrowserRouter>; }
+export default function App() {
+  return (
+    <BrowserRouter>
+      <Shell />
+    </BrowserRouter>
+  );
+}

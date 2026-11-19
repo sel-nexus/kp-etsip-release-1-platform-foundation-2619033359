@@ -1,0 +1,92 @@
+import { test, expect } from '@playwright/test';
+
+test('portfolio leader creates and edits within assigned scope and cannot access or write another scope', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', error => errors.push(error.message));
+  page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
+  const name = `E2E leader application ${Date.now()}-${Math.random().toString(36).slice(2)}`;
+  await page.goto('/login');
+  await page.getByLabel('Email').fill(process.env.E2E_LEADER_EMAIL ?? 'leader@ketsip.local');
+  await page.getByLabel('Password').fill(process.env.E2E_LEADER_PASSWORD ?? process.env.E2E_DEMO_PASSWORD ?? 'LocalDemo123!');
+  const login = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/login' && response.request().method() === 'POST');
+  await page.getByRole('button', { name: 'Sign in' }).click();
+  const loginResponse = await login;
+  expect(loginResponse.status()).toBe(200);
+  const session = await loginResponse.json();
+  expect(session.user.role).toBe('Portfolio Leader');
+  expect(session.user.portfolioAccess.length).toBeGreaterThan(0);
+  const headers = { Authorization: `Bearer ${session.token}` };
+  await page.getByRole('link', { name: 'Applications' }).click();
+  await page.getByRole('button', { name: 'Create application' }).click();
+  const form = page.locator('form');
+  await form.getByLabel('Name', { exact: true }).fill(name);
+  await expect(form.getByLabel('Portfolio').locator('option', { hasText: 'Customer Platform' })).toHaveCount(0);
+  await form.getByLabel('Portfolio').selectOption({ label: 'Payments' });
+  const assignedPortfolio = await form.getByLabel('Portfolio').inputValue();
+  expect(session.user.portfolioAccess).toContain(assignedPortfolio);
+  await form.getByLabel('Business owner').fill('Leader original owner');
+  const created = page.waitForResponse(response => new URL(response.url()).pathname === '/api/applications' && response.request().method() === 'POST');
+  await form.getByRole('button', { name: 'Save application' }).click();
+  const createResponse = await created;
+  expect(createResponse.status()).toBe(201);
+  const application = await createResponse.json();
+  expect(application.name).toBe(name);
+  expect(application.portfolioId).toBe(assignedPortfolio);
+  await expect(page.getByRole('heading', { name, exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Edit application' }).click();
+  await form.getByLabel('Business owner').fill('Leader updated owner');
+  const updated = page.waitForResponse(response => new URL(response.url()).pathname === `/api/applications/${application.id}` && response.request().method() === 'PUT');
+  await form.getByRole('button', { name: 'Save application' }).click();
+  const updateResponse = await updated;
+  expect(updateResponse.status()).toBe(200);
+  const updatedApplication = await updateResponse.json();
+  expect(updatedApplication.businessOwner).toBe('Leader updated owner');
+  await expect(page.getByText('Leader updated owner', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByText('Leader updated owner', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete application' })).toHaveCount(0);
+
+  // Obtain the other seeded scope through a separate real administrator session.
+  const adminLogin = await page.request.post('/api/auth/login', { data: {
+    email: process.env.E2E_ADMIN_EMAIL ?? 'admin@ketsip.local',
+    password: process.env.E2E_ADMIN_PASSWORD ?? 'LocalAdmin123!',
+  } });
+  expect(adminLogin.status()).toBe(200);
+  const adminSession = await adminLogin.json();
+  const adminHeaders = { Authorization: `Bearer ${adminSession.token}` };
+  const portfoliosResponse = await page.request.get('/api/portfolios', { headers: adminHeaders });
+  expect(portfoliosResponse.status()).toBe(200);
+  const portfolios = await portfoliosResponse.json();
+  const otherPortfolio = portfolios.items.find((item: { name: string }) => item.name === 'Customer Platform');
+  expect(otherPortfolio).toBeDefined();
+  expect(session.user.portfolioAccess).not.toContain(otherPortfolio.id);
+  const otherList = await page.request.get('/api/applications', { headers: adminHeaders, params: { portfolioId: otherPortfolio.id } });
+  expect(otherList.status()).toBe(200);
+  const otherApps = await otherList.json();
+  const otherApplication = otherApps.items.find((item: { name: string }) => item.name === 'Customer Profile');
+  expect(otherApplication).toBeDefined();
+
+  const deniedRead = await page.request.get(`/api/applications/${otherApplication.id}`, { headers });
+  expect(deniedRead.status()).toBe(403);
+  const { id: _id, createdAt: _createdAt, updatedAt: _updatedAt, ...fields } = updatedApplication;
+  const deniedCreateName = `${name} outside scope`;
+  const deniedCreate = await page.request.post('/api/applications', { headers, data: { ...fields, name: deniedCreateName, portfolioId: otherPortfolio.id } });
+  expect(deniedCreate.status()).toBe(403);
+  const deniedTransfer = await page.request.put(`/api/applications/${application.id}`, { headers, data: { ...fields, portfolioId: otherPortfolio.id } });
+  expect(deniedTransfer.status()).toBe(403);
+  const deniedEdit = await page.request.put(`/api/applications/${otherApplication.id}`, { headers, data: { ...fields, portfolioId: otherPortfolio.id } });
+  expect(deniedEdit.status()).toBe(403);
+  const stillOwned = await page.request.get(`/api/applications/${application.id}`, { headers });
+  expect(stillOwned.status()).toBe(200);
+  expect((await stillOwned.json()).portfolioId).toBe(assignedPortfolio);
+  const unchanged = await page.request.get(`/api/applications/${otherApplication.id}`, { headers: adminHeaders });
+  expect(unchanged.status()).toBe(200);
+  const unchangedApplication = await unchanged.json();
+  expect(unchangedApplication.name).toBe(otherApplication.name);
+  expect(unchangedApplication.portfolioId).toBe(otherPortfolio.id);
+  expect(unchangedApplication.updatedAt).toBe(otherApplication.updatedAt);
+  const notCreated = await page.request.get('/api/applications', { headers: adminHeaders, params: { search: deniedCreateName } });
+  expect(notCreated.status()).toBe(200);
+  expect((await notCreated.json()).total).toBe(0);
+  expect(errors).toEqual([]);
+});

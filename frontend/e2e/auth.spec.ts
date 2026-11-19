@@ -6,7 +6,7 @@ test('live sign-in, preference persistence and sign-out', async ({ page }) => {
   page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
   await page.goto('/login');
   await page.getByLabel('Email').fill(process.env.E2E_EMAIL ?? 'engineer@ketsip.local');
-  await page.getByLabel('Password').fill(process.env.E2E_PASSWORD ?? 'LocalDemo123!');
+  await page.getByLabel('Password').fill(process.env.E2E_PASSWORD ?? process.env.E2E_DEMO_PASSWORD ?? 'LocalDemo123!');
   const login = page.waitForResponse(response => response.url().endsWith('/api/auth/login') && response.request().method() === 'POST');
   await page.getByRole('button', { name: 'Sign in' }).click();
   expect((await login).status()).toBe(200);

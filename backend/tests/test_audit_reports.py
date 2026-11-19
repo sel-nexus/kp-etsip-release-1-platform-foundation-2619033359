@@ -96,8 +96,10 @@ async def test_reports_scope_filters_and_csv(client):
     result = await client.get('/api/reports/applications', headers=engineer, params={'search': '=danger', 'limit': 1})
     assert result.status_code == 200 and result.json()['total'] == 1
     result = await client.get('/api/reports/applications', headers=leader, params={'search': '=danger', 'format': 'csv', 'limit': 1, 'offset': 99})
+    assert result.status_code == 200
     assert list(csv.DictReader(io.StringIO(result.text)))[0]['name'] == "'=danger"
     result = await client.get('/api/reports/portfolios', headers=engineer, params={'search': 'Payments', 'format': 'csv'})
+    assert result.status_code == 200
     rows = list(csv.DictReader(io.StringIO(result.text)))
     assert len(rows) == 1 and rows[0]['id'] == own_id
     assert int(rows[0]['applicationCount']) == await app.state.db.applications.count_documents({'portfolioId': own_id})
@@ -105,7 +107,9 @@ async def test_reports_scope_filters_and_csv(client):
     assert (await client.get('/api/reports/applications', headers=engineer, params={'riskLevel': 'Invalid'})).status_code == 422
     assert (await client.get('/api/reports/portfolios', headers=engineer, params={'limit': 101})).status_code == 422
     await app.state.db.users.update_one({'email': 'leader@ketsip.local'}, {'$set': {'portfolioAccess': []}})
-    assert (await client.get('/api/reports/portfolios', headers=leader)).json()['total'] == 0
+    _response = await client.get('/api/reports/portfolios', headers=leader)
+    assert _response.status_code == 200
+    assert (_response).json()['total'] == 0
     await app.state.db.roles.update_one({'name': 'Engineer'}, {'$set': {'permissions': ['view']}})
     assert (await client.get('/api/reports/applications?format=csv', headers=engineer)).status_code == 403
     await app.state.db.roles.update_one({'name': 'Read Only'}, {'$set': {'permissions': ['view', 'export']}})
@@ -127,9 +131,38 @@ async def test_complete_filtered_csv_and_persisted_inventory(client):
     page = await client.get('/api/reports/applications', headers=auth, params=params)
     assert page.status_code == 200 and page.json()['total'] == 105 and len(page.json()['items']) == 2
     exported = await client.get('/api/reports/applications', headers=auth, params={**params, 'format': 'csv', 'offset': 100})
+    assert exported.status_code == 200
     rows = list(csv.DictReader(io.StringIO(exported.text)))
     assert len(rows) == 105 and all(row['portfolioId'] == portfolio_id for row in rows)
     assert await app.state.db.audit_logs.count_documents({'action': 'export', 'entityType': 'application report'}) == 1
     auditor = await login(client, 'auditor')
     result = await client.get('/api/audit-logs', headers=auditor, params={'action': 'export'})
+    assert result.status_code == 200
     assert any(item['entityType'] == 'application report' for item in result.json()['items'])
+
+
+async def test_all_csv_exports_neutralize_formula_and_control_prefixes(client):
+    """Check parsed cells for every export, including whitespace and control prefixes."""
+    auth = await login(client, 'admin')
+    db = app.state.db
+    portfolio = await db.portfolios.find_one({'name': 'Payments'})
+    application = await db.applications.find_one({'portfolioId': str(portfolio['_id'])})
+    values = ['=1+1', '+SUM(1)', '-1+2', '@SUM(1)', '  =1+1', '\tplain', '\rplain', '\nplain', ' \tplain', '=HYPERLINK("https://example.com", "a,b")\nnext']
+    for index, value in enumerate(values):
+        # Direct writes cover legacy stored values, including controls stripped by input validation.
+        await db.applications.update_one({'_id': application['_id']}, {'$set': {'name': value}})
+        await db.portfolios.update_one({'_id': portfolio['_id']}, {'$set': {'owner': value}})
+        marker = f'csv-marker-{index}'
+        await db.audit_logs.insert_one({'timestamp': '2024-04-03T12:00:00+00:00', 'userId': marker, 'userName': value, 'action': 'edit', 'entityType': 'test', 'entityId': None, 'details': value})
+        for path, params, column, match_key, match_value in (
+            ('/api/applications/export', {'portfolioId': str(portfolio['_id'])}, 'name', 'name', "'" + value),
+            ('/api/reports/applications', {'format': 'csv', 'portfolioId': str(portfolio['_id'])}, 'name', 'id', str(application['_id'])),
+            ('/api/reports/portfolios', {'format': 'csv', 'search': 'Payments'}, 'owner', 'id', str(portfolio['_id'])),
+            ('/api/audit-logs', {'format': 'csv', 'userId': marker}, 'userName', 'userId', marker),
+        ):
+            response = await client.get(path, headers=auth, params=params)
+            assert response.status_code == 200, (path, response.text)
+            rows = list(csv.DictReader(io.StringIO(response.text, newline='')))
+            matches = [row for row in rows if row[match_key] == match_value]
+            assert len(matches) == 1, (path, repr(value), rows)
+            assert matches[0][column] == "'" + value, (path, repr(value), matches[0][column])

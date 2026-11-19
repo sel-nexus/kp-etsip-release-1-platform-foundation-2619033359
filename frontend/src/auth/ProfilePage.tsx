@@ -37,10 +37,16 @@ export default function ProfilePage({ user, onUpdate }: Props) {
         <section className="card" aria-labelledby="identity-heading">
           <h2 id="identity-heading">Identity &amp; access</h2>
           <dl>
-            <dt>Name</dt><dd>{user.name}</dd>
-            <dt>Email</dt><dd>{user.email}</dd>
-            <dt>Role</dt><dd>{user.role}</dd>
-            <dt>Portfolio access</dt><dd>{user.portfolioAccess.length ? user.portfolioAccess.join(', ') : user.role === 'Portfolio Leader' ? 'No assigned portfolios' : 'All portfolios'}</dd>
+            <dt>Name</dt>
+            <dd>{user.name}</dd>
+            <dt>Email</dt>
+            <dd>{user.email}</dd>
+            <dt>Role</dt>
+            <dd>{user.role}</dd>
+            <dt>Portfolio access</dt>
+            <dd>
+              {user.portfolioAccess.length ? user.portfolioAccess.join(', ') : user.role === 'Portfolio Leader' ? 'No assigned portfolios' : 'All portfolios'}
+            </dd>
           </dl>
         </section>
         <section className="card" aria-labelledby="password-heading">
@@ -48,9 +54,28 @@ export default function ProfilePage({ user, onUpdate }: Props) {
           <p>Use at least 12 characters, up to 72 UTF-8 bytes.</p>
           <form onSubmit={changePassword}>
             <label htmlFor="current-password">Current password</label>
-            <input id="current-password" type="password" autoComplete="current-password" required aria-required="true" value={current} onChange={e => setCurrent(e.target.value)} aria-describedby={error ? 'profile-error' : undefined} />
+            <input
+              id="current-password"
+              type="password"
+              autoComplete="current-password"
+              required
+              aria-required="true"
+              value={current}
+              onChange={e => setCurrent(e.target.value)}
+              aria-describedby={error ? 'profile-error' : undefined}
+            />
             <label htmlFor="new-password">New password</label>
-            <input id="new-password" type="password" autoComplete="new-password" required aria-required="true" minLength={12} maxLength={72} value={next} onChange={e => setNext(e.target.value)} />
+            <input
+              id="new-password"
+              type="password"
+              autoComplete="new-password"
+              required
+              aria-required="true"
+              minLength={12}
+              maxLength={72}
+              value={next}
+              onChange={e => setNext(e.target.value)}
+            />
             <button disabled={busy} type="submit">Update password</button>
           </form>
         </section>

@@ -28,9 +28,27 @@ export default function LoginPage({ onLogin }: Props) {
         <p>Use your local account to continue.</p>
         <form onSubmit={submit}>
           <label htmlFor="email">Email</label>
-          <input id="email" type="email" autoComplete="username" required aria-required="true" value={email} onChange={e => setEmail(e.target.value)} />
+          <input
+            id="email"
+            type="email"
+            autoComplete="username"
+            required
+            aria-required="true"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+          />
           <label htmlFor="password">Password</label>
-          <input id="password" type="password" autoComplete="current-password" required aria-required="true" value={password} onChange={e => setPassword(e.target.value)} aria-invalid={!!error} aria-describedby={error ? 'login-error' : undefined} />
+          <input
+            id="password"
+            type="password"
+            autoComplete="current-password"
+            required
+            aria-required="true"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            aria-invalid={!!error}
+            aria-describedby={error ? 'login-error' : undefined}
+          />
           {error && <p id="login-error" role="alert" className="error">{error}</p>}
           <button type="submit" disabled={busy}>{busy ? 'Signing in…' : 'Sign in'}</button>
         </form>

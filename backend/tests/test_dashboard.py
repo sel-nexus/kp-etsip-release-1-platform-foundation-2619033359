@@ -70,15 +70,23 @@ async def test_exact_metrics_and_combined_filters(client):
     rows = {row['portfolioId']: row for row in body['portfolios']}
     assert rows[own] == {'portfolioId': own, 'name': 'Payments', 'applicationCount': 2, 'qualityScore': 1, 'applicationsAtRisk': 1}
     assert rows[other]['qualityScore'] == 100 and rows[other]['applicationsAtRisk'] == 1
-    filtered = (await client.get('/api/dashboard/executive', headers=auth, params={'portfolioId': own, 'productArea': 'Shared', 'riskLevel': 'High'})).json()
+    response = await client.get('/api/dashboard/executive', headers=auth, params={'portfolioId': own, 'productArea': 'Shared', 'riskLevel': 'High'})
+    assert response.status_code == 200
+    filtered = response.json()
     assert filtered['totalApplications'] == 1 and filtered['totalPortfolios'] == 1
     assert filtered['enterpriseQualityScore'] == 0 and filtered['openCriticalDefects'] == 0
     assert filtered['portfolios'][0]['qualityScore'] == 0
-    area = (await client.get('/api/dashboard/executive', headers=auth, params={'productArea': 'Shared'})).json()
+    response = await client.get('/api/dashboard/executive', headers=auth, params={'productArea': 'Shared'})
+    assert response.status_code == 200
+    area = response.json()
     assert area['totalApplications'] == 2 and area['totalPortfolios'] == 2 and area['enterpriseQualityScore'] == 50
-    risk = (await client.get('/api/dashboard/executive', headers=auth, params={'riskLevel': 'Low'})).json()
+    response = await client.get('/api/dashboard/executive', headers=auth, params={'riskLevel': 'Low'})
+    assert response.status_code == 200
+    risk = response.json()
     assert risk['totalApplications'] == 1 and risk['applicationsAtRisk'] == 0
-    empty = (await client.get('/api/dashboard/executive', headers=auth, params={'productArea': 'missing'})).json()
+    response = await client.get('/api/dashboard/executive', headers=auth, params={'productArea': 'missing'})
+    assert response.status_code == 200
+    empty = response.json()
     assert empty == {'enterpriseQualityScore': None, 'applicationHealthScore': None, 'automationMaturityScore': None, 'openCriticalDefects': 0, 'applicationsAtRisk': 0, 'totalApplications': 0, 'totalPortfolios': 0, 'portfolios': []}
     assert (await client.get('/api/dashboard/executive', headers=auth, params={'riskLevel': 'Invalid'})).status_code == 422
 
@@ -99,7 +107,8 @@ async def test_auth_scope_permission_and_role_ceiling(client):
     assert [item['portfolioId'] for item in scoped.json()['portfolios']] == [own]
     assert (await client.get('/api/dashboard/executive', headers=leader, params={'portfolioId': other})).status_code == 403
     await app.state.db.users.update_one({'email': 'leader@ketsip.local'}, {'$set': {'portfolioAccess': []}})
-    assert (await client.get('/api/dashboard/executive', headers=leader)).json()['totalApplications'] == 0
+    response = await client.get('/api/dashboard/executive', headers=leader)
+    assert response.status_code == 200 and response.json()['totalApplications'] == 0
     assert (await client.get('/api/dashboard/executive', headers=leader, params={'portfolioId': own})).status_code == 403
     await app.state.db.roles.update_one({'name': 'Executive'}, {'$set': {'permissions': ['export']}})
     assert (await client.get('/api/dashboard/executive', headers=await login(client))).status_code == 403
