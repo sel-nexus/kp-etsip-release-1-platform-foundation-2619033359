@@ -8,7 +8,7 @@ The application implements local identity and profile, portfolio and application
 
 For a manual run use Python 3.12, Node.js 22 and npm (the container build uses these versions), plus a reachable MongoDB; the Compose setup requires Docker and Compose instead. Use an isolated MongoDB instance for development, never a shared or production database. The default backend example points to `mongodb://127.0.0.1:27017` and database `kp_etsip`; start Mongo separately or set `MONGODB_URI` and `MONGODB_DB` to your isolated instance. Do not expose an unauthenticated MongoDB publicly.
 
-Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example` to `frontend/.env` if absent. These files are local and gitignored. **The public example JWT secret is rejected at startup, including when seeding is enabled.** Replace it in `backend/.env` with a unique random secret of at least 32 characters (generate one with `python3 -c 'import secrets; print(secrets.token_urlsafe(48))'`). When seeding is enabled, both initial passwords must be at least 12 characters and at most 72 bytes. Use separate strong passwords; do not commit secrets.
+Copy `backend/.env.example` to `backend/.env` and `frontend/.env.example` to `frontend/.env` if absent. These files are local and gitignored. The example leaves secrets blank. Set `JWT_SECRET` in `backend/.env` to a unique random secret of at least 32 characters (generate one with `python3 -c 'import secrets; print(secrets.token_urlsafe(48))'`). When seeding is enabled, both initial passwords must be at least 12 characters and at most 72 bytes. Use separate strong passwords; do not commit secrets.
 
 In a terminal:
 
@@ -42,7 +42,7 @@ Administration mutations are serialized using the `admin_locks` document with `_
 
 ## Security and deployment
 
-Set a unique high-entropy `JWT_SECRET` of at least 32 characters, use separate strong initial passwords, disable seeding after provisioning, use authenticated TLS MongoDB and restrict database network access. Terminate HTTPS at the CDN/load balancer, configure explicit CORS origins if cross-origin, and never expose the development compose database publicly. The example secret and passwords are public dummy values and **must not be used in deployment**. The public example secret is rejected at startup, including during seeding. JWTs last eight hours; profile password changes revoke older tokens. Logout clears the browser token but does not revoke an already copied token. Bearer tokens are stored in sessionStorage to satisfy the API contract; XSS can read them. The nginx configuration sets a restrictive CSP; avoid unsafe HTML insertion and maintain CSP at the production edge. Configure rate limiting at the edge for login.
+Set a unique high-entropy `JWT_SECRET` of at least 32 characters, use separate strong initial passwords, disable seeding after provisioning, use authenticated TLS MongoDB and restrict database network access. Terminate HTTPS at the CDN/load balancer, configure explicit CORS origins if cross-origin, and never expose the development compose database publicly. The example leaves secret fields blank; supply unique values privately. JWTs last eight hours; profile password changes revoke older tokens. Logout clears the browser token but does not revoke an already copied token. Bearer tokens are stored in sessionStorage to satisfy the API contract; XSS can read them. The nginx configuration sets a restrictive CSP; avoid unsafe HTML insertion and maintain CSP at the production edge. Configure rate limiting at the edge for login.
 
 ## Checks
 
